@@ -6,7 +6,7 @@ import random
 import math
 import time
 
-# pretty well
+# pretty well, all cantos
 
 class GeneticAlgorithm(LayoutDisplayMixin):
     def __init__(self, TAM_POP, recortes_disponiveis, sheet_width, sheet_height, numero_geracoes=150, taxa_mutacao=0.2):
@@ -88,7 +88,8 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         areas_ocupadas = torch.zeros(batch_size, device=self.device)
         sobreposicoes = torch.zeros(batch_size, device=self.device)
         fora_limites = torch.zeros(batch_size, device=self.device)
-        compactness = torch.zeros(batch_size, device=self.device)  # Novo: mede quão compacto está o layout
+        compactness = torch.zeros(batch_size, device=self.device)  # Mede quão compacto está o layout
+        corner_proximity = torch.zeros(batch_size, device=self.device)  # NOVO: Mede proximidade ao canto
         
         # Função para avaliar um único indivíduo
         def avaliar_individuo(idx):
@@ -99,7 +100,7 @@ class GeneticAlgorithm(LayoutDisplayMixin):
             sobreposicao = 0
             fora_limite = 0
             
-            # Obter centróide and dimensões para calcular compactness depois
+            # Obter centróide e dimensões para cálculos
             pontos_x = []
             pontos_y = []
             
@@ -178,8 +179,31 @@ class GeneticAlgorithm(LayoutDisplayMixin):
                     avg_dist = total_dist / count
                     # Normalização: quanto menor a distância média, maior o valor de compactness
                     compact = 1 / (1 + avg_dist / max(self.sheet_width, self.sheet_height))
+            
+            # Calcular proximidade considerando todos os cantos
+            corner_prox = 0
+            if pontos_x and pontos_y:
+                # Calcular o centróide médio de todas as peças
+                avg_x = sum(pontos_x) / len(pontos_x)
+                avg_y = sum(pontos_y) / len(pontos_y)
+                
+                # Definir os cantos da chapa
+                corners = [
+                    (0, 0),
+                    (0, self.sheet_height),
+                    (self.sheet_width, 0),
+                    (self.sheet_width, self.sheet_height)
+                ]
+                min_corner_dist = float('inf')
+                for corner_x, corner_y in corners:
+                    dist = ((avg_x - corner_x)**2 + (avg_y - corner_y)**2)**0.5
+                    min_corner_dist = min(min_corner_dist, dist)
+                
+                # Normalizar: quanto menor a distância ao canto mais próximo, maior o valor
+                diagonal = ((self.sheet_width)**2 + (self.sheet_height)**2)**0.5
+                corner_prox = 1 - (min_corner_dist / diagonal)  # Valor entre 0 e 1
                     
-            return idx, area_ocupada, sobreposicao, fora_limite, compact
+            return idx, area_ocupada, sobreposicao, fora_limite, compact, corner_prox
         
         # Usar multithreading para avaliar indivíduos em paralelo
         max_workers = min(cpu_count() + 1, batch_size)
@@ -188,24 +212,27 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(avaliar_individuo, i) for i in range(batch_size)]
             for future in concurrent.futures.as_completed(futures):
-                idx, area, sobrep, fora, comp = future.result()
+                idx, area, sobrep, fora, comp, corner = future.result()
                 areas_ocupadas[idx] = area
                 sobreposicoes[idx] = sobrep
                 fora_limites[idx] = fora
                 compactness[idx] = comp
-                resultados.append((idx, area, sobrep, fora, comp))
+                corner_proximity[idx] = corner
+                resultados.append((idx, area, sobrep, fora, comp, corner))
         
         # Calcular aptidão final com ponderações ajustadas
         validas = torch.tensor([len(ind) for ind in self.POP], device=self.device) - sobreposicoes - fora_limites
         
         # Pesos
-        w1 = 5.0  # Peso para peças válidas (maior prioridade)
-        w2 = 2.0  # Peso para área ocupada (importante)
-        w3 = 2.0  # Peso para penalização de sobreposições and peças fora dos limites
-        w4 = 1.5  # Peso para compactness (moderado)
+        w1 = 5.0   # Peso para peças válidas (maior prioridade)
+        w2 = 2.0   # Peso para área ocupada (importante)
+        w3 = 2.0   # Peso para penalização de sobreposições e peças fora dos limites
+        w4 = 1.5   # Peso para compactness (moderado)
+        w5 = 2.0   # NOVO: Peso para proximidade ao canto (importante)
         
-        # Calcular aptidão final
-        self.aptidao = (w1 * validas) + (w2 * areas_ocupadas) - (w3 * (sobreposicoes + fora_limites)) + (w4 * compactness)
+        # Calcular aptidão final, agora incluindo proximidade ao canto
+        self.aptidao = (w1 * validas) + (w2 * areas_ocupadas) - (w3 * (sobreposicoes + fora_limites)) + \
+                      (w4 * compactness) + (w5 * corner_proximity)
 
     def selection(self):
         pais = []
@@ -220,7 +247,6 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         return pais
 
     def crossover(self, pai1, pai2):
-        """Crossover uniforme entre dois pais, sem conceito de 'peças fixas'."""
         tamanho_min = min(len(pai1), len(pai2))
         filho = []
         
@@ -407,25 +433,55 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         
         pecas_validas = []
         
-        # Ordenar peças por área (tentar colocar peças maiores primeiro)
+        # Ordenar peças considerando área e distância aos cantos
         pecas_ordenadas = []
+        corners = [
+            (0, 0),                           # Canto inferior esquerdo
+            (0, self.sheet_height),           # Canto superior esquerdo
+            (self.sheet_width, 0),            # Canto inferior direito
+            (self.sheet_width, self.sheet_height)  # Canto superior direito
+        ]
+        
         for peca in individuo:
             tipo = peca["tipo"]
-            if tipo == "retangular":
-                area = peca["largura"] * peca["altura"]
-            elif tipo == "diamante":
-                area = (peca["largura"] * peca["altura"]) / 2
+            x, y = peca["x"], peca["y"]
+            
+            # Calcular centro da peça
+            if tipo == "retangular" or tipo == "diamante":
+                largura, altura = peca["largura"], peca["altura"]
+                centro_x = x + largura/2
+                centro_y = y + altura/2
+                if tipo == "retangular":
+                    area = peca["largura"] * peca["altura"]
+                else:
+                    area = (peca["largura"] * peca["altura"]) / 2
             elif tipo == "circular":
+                raio = peca["r"]
+                centro_x = x + raio
+                centro_y = y + raio
                 area = 3.1416 * peca["r"] ** 2
             else:
+                centro_x, centro_y = x, y
                 area = 0
-                
-            pecas_ordenadas.append((peca, area))
+            
+            # Encontrar o canto mais próximo
+            min_corner_dist = float('inf')
+            for corner_x, corner_y in corners:
+                dist = ((centro_x - corner_x)**2 + (centro_y - corner_y)**2)**0.5
+                min_corner_dist = min(min_corner_dist, dist)
+            
+            # Calcular pontuação composta: área - distância ao canto (normalizada)
+            # Isso favorece peças grandes e próximas aos cantos
+            diagonal = ((self.sheet_width)**2 + (self.sheet_height)**2)**0.5
+            corner_factor = min_corner_dist / diagonal  # Normalizado entre 0 e 1
+            pontuacao = area - (corner_factor * area * 0.5)  # Redução de até 50% baseada na distância
+            
+            pecas_ordenadas.append((peca, pontuacao))
         
-        # Ordenar por área decrescente
+        # Ordenar por pontuação decrescente
         pecas_ordenadas.sort(key=lambda x: x[1], reverse=True)
         
-        # Processar peças na ordem de área
+        # Processar peças na ordem de pontuação
         for peca_tuple in pecas_ordenadas:
             peca = peca_tuple[0]
             tipo = peca["tipo"]
