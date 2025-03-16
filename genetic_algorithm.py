@@ -6,7 +6,7 @@ import random
 import math
 import time
 
-# pretty well, all cantos
+# Its done
 
 class GeneticAlgorithm(LayoutDisplayMixin):
     def __init__(self, TAM_POP, recortes_disponiveis, sheet_width, sheet_height, numero_geracoes=150, taxa_mutacao=0.2):
@@ -180,28 +180,22 @@ class GeneticAlgorithm(LayoutDisplayMixin):
                     # Normalização: quanto menor a distância média, maior o valor de compactness
                     compact = 1 / (1 + avg_dist / max(self.sheet_width, self.sheet_height))
             
-            # Calcular proximidade considerando todos os cantos
+            # Calcular proximidade apenas ao canto inferior esquerdo
             corner_prox = 0
             if pontos_x and pontos_y:
                 # Calcular o centróide médio de todas as peças
                 avg_x = sum(pontos_x) / len(pontos_x)
                 avg_y = sum(pontos_y) / len(pontos_y)
                 
-                # Definir os cantos da chapa
-                corners = [
-                    (0, 0),
-                    (0, self.sheet_height),
-                    (self.sheet_width, 0),
-                    (self.sheet_width, self.sheet_height)
-                ]
-                min_corner_dist = float('inf')
-                for corner_x, corner_y in corners:
-                    dist = ((avg_x - corner_x)**2 + (avg_y - corner_y)**2)**0.5
-                    min_corner_dist = min(min_corner_dist, dist)
+                # Canto específico (inferior esquerdo)
+                corner_x, corner_y = 0, 0
                 
-                # Normalizar: quanto menor a distância ao canto mais próximo, maior o valor
+                # Calcular distância a este canto específico
+                dist = ((avg_x - corner_x)**2 + (avg_y - corner_y)**2)**0.5
+                
+                # Normalizar: quanto menor a distância ao canto, maior o valor
                 diagonal = ((self.sheet_width)**2 + (self.sheet_height)**2)**0.5
-                corner_prox = 1 - (min_corner_dist / diagonal)  # Valor entre 0 e 1
+                corner_prox = 1 - (dist / diagonal)  # Valor entre 0 e 1
                     
             return idx, area_ocupada, sobreposicao, fora_limite, compact, corner_prox
         
@@ -422,7 +416,7 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         print("Starting optimization...")
         self.display_layout(self.initial_layout, title="Initial Layout")
         self.optimized_layout = self.run()
-        self.display_layout(self.optimized_layout, title="Optimized Layout")
+        # self.display_layout(self.optimized_layout, title="Optimized Layout")
         return self.optimized_layout
 
     def encontrar_todas_pecas_validas(self, individuo):
