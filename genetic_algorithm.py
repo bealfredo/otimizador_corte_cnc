@@ -79,33 +79,33 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         self.aptidao = torch.zeros(self.TAM_POP, device=self.device)
 
     def evaluate_batch(self):
-        """Avalia a população de forma sequencial."""
+        """Avalia a população em lote com otimizações para melhor desempenho."""
+        import concurrent.futures
+        from multiprocessing import cpu_count
         
         # Inicializa arrays para armazenar resultados
         batch_size = self.TAM_POP
         areas_ocupadas = torch.zeros(batch_size, device=self.device)
         sobreposicoes = torch.zeros(batch_size, device=self.device)
         fora_limites = torch.zeros(batch_size, device=self.device)
-        compactness = torch.zeros(batch_size, device=self.device)
+        compactness = torch.zeros(batch_size, device=self.device)  # Novo: mede quão compacto está o layout
         
-        # Avaliar cada indivíduo sequencialmente
-        print("Avaliando população...")
-        for idx in range(batch_size):
-            # Criar matriz local para cada indivíduo
-            matriz = torch.zeros((self.sheet_height, self.sheet_width), device=self.device, dtype=torch.bool)
+        # Função para avaliar um único indivíduo
+        def avaliar_individuo(idx):
+            # Criar matriz local para evitar condições de corrida
+            matriz = torch.zeros((self.sheet_height, self.sheet_width), device="cpu", dtype=torch.bool)
             individuo = self.POP[idx]
             area_ocupada = 0
             sobreposicao = 0
             fora_limite = 0
             
-            # Obter centróide e dimensões para cálculos
+            # Obter centróide and dimensões para calcular compactness depois
             pontos_x = []
             pontos_y = []
             
             aux_canvas = AuxCanvas(self.sheet_height, self.sheet_width, self.sheet_width, 
-                                  self.sheet_height, matriz, self.device)
+                                  self.sheet_height, matriz, "cpu")
             
-            # Avaliar cada peça do indivíduo
             for peca in individuo:
                 tipo = peca["tipo"]
                 x, y = peca["x"], peca["y"]
@@ -179,11 +179,21 @@ class GeneticAlgorithm(LayoutDisplayMixin):
                     # Normalização: quanto menor a distância média, maior o valor de compactness
                     compact = 1 / (1 + avg_dist / max(self.sheet_width, self.sheet_height))
                     
-            # Armazenar resultados para este indivíduo
-            areas_ocupadas[idx] = area_ocupada
-            sobreposicoes[idx] = sobreposicao
-            fora_limites[idx] = fora_limite
-            compactness[idx] = compact
+            return idx, area_ocupada, sobreposicao, fora_limite, compact
+        
+        # Usar multithreading para avaliar indivíduos em paralelo
+        max_workers = min(cpu_count() + 1, batch_size)
+        resultados = []
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(avaliar_individuo, i) for i in range(batch_size)]
+            for future in concurrent.futures.as_completed(futures):
+                idx, area, sobrep, fora, comp = future.result()
+                areas_ocupadas[idx] = area
+                sobreposicoes[idx] = sobrep
+                fora_limites[idx] = fora
+                compactness[idx] = comp
+                resultados.append((idx, area, sobrep, fora, comp))
         
         # Calcular aptidão final com ponderações ajustadas
         validas = torch.tensor([len(ind) for ind in self.POP], device=self.device) - sobreposicoes - fora_limites
@@ -264,10 +274,16 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         self.POP = self.POP_AUX
 
     def run(self):
-        """Executa o algoritmo genético"""
+        """Executa o algoritmo genético com otimizações de performance."""
+        import concurrent.futures
+        from multiprocessing import cpu_count
         
-        print("\n=== Iniciando Algoritmo Genético ===")
+        print("\n=== Iniciando Algoritmo Genético com processamento paralelo ===")
         recortes_disponiveis = copy.deepcopy(self.initial_layout)
+        
+        # Número máximo de workers para processamento paralelo
+        max_workers = min(cpu_count() + 1, 16)  # Limitar para não sobrecarregar o sistema
+        print(f"Usando até {max_workers} threads para processamento paralelo")
         
         # Inicializar população com todos os recortes disponíveis
         print(f"Inicializando população com {len(recortes_disponiveis)} peças...")
@@ -281,7 +297,7 @@ class GeneticAlgorithm(LayoutDisplayMixin):
         
         print(f"Iniciando evolução por {self.geracoes_totais} gerações...")
         for geracao in range(self.geracoes_totais):
-            # Avaliar população sequencialmente
+            # Avaliar população em paralelo
             self.evaluate_batch()
             
             # Registrar melhor aptidão
@@ -545,8 +561,8 @@ class AuxCanvas:
                     pixel_x = j
                     pixel_y = canvas.shape[0] - i
                     # Equação do diamante: |x-x0|/a + |y-y0|/b <= 1
-                    if ((abs(j - centro_x) / metade_largura + 
-                         abs(i - centro_matrix_y) / metade_altura) <= 1):
+                    if ((abs(pixel_x - centro_x) / metade_largura + 
+                         abs(pixel_y - centro_y) / metade_altura) <= 1):
                         if canvas[i, j]:
                             return True
             return False
@@ -563,7 +579,7 @@ class AuxCanvas:
                     pixel_x = j
                     pixel_y = canvas.shape[0] - i
                     # Equação do círculo: (x-x0)² + (y-y0)² <= r²
-                    if ((pixel_x - centro_x)**2 + (pixel_y - centro_matrix_y)**2 <= raio**2):
+                    if ((pixel_x - centro_x)**2 + (pixel_y - centro_y)**2 <= raio**2):
                         if canvas[i, j]:
                             return True
             return False
