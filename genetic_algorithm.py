@@ -46,7 +46,7 @@ class GeneticAlgorithm(LayoutDisplayMixin):
 
             print(f"Successfully placed {len(placed_pieces)} pieces")
             
-            # Visualizar o resultado - 0,0 no canto inferior esquerdo
+            # Display the canvas with placed pieces
             canvas_np = self.matriz_chapa.cpu().numpy() if self.device.type == 'cuda' else self.matriz_chapa.numpy()
             plt.figure(figsize=(10, 5))
             plt.imshow(canvas_np, cmap='gray')
@@ -115,15 +115,7 @@ class AuxCanvas():
         else:
             # Draw the rectangle - note reversed y coordinates
             canvas[y_matrix_start:y_matrix_end, x_start:x_end] = 1
-            
-        # Return the updated piece with its coordinates in the LayoutDisplayMixin system
-        resultado = copy.deepcopy(recorte)
-        resultado["x"] = x
-        resultado["y"] = y  # This is already in bottom-left coordinate system
-        # Make sure rotation is preserved
-        if "rotacao" in recorte:
-            resultado["rotacao"] = recorte["rotacao"]
-        return resultado
+
 
     @staticmethod
     def desenhar_diamante(canvas, x, y, largura, altura, recorte):
@@ -150,14 +142,6 @@ class AuxCanvas():
                 if (abs(matrix_x - centro_x) / metade_largura + abs(matrix_y - centro_y) / metade_altura) <= 1:
                     canvas[matrix_y, matrix_x] = 1
                     
-        # Return the updated piece with its coordinates in the LayoutDisplayMixin system
-        resultado = copy.deepcopy(recorte)
-        resultado["x"] = x
-        resultado["y"] = y  # This is already in bottom-left coordinate system
-        # Make sure rotation is preserved
-        if "rotacao" in recorte:
-            resultado["rotacao"] = recorte["rotacao"]
-        return resultado
 
     @staticmethod
     def desenhar_circulo(canvas, x, y, raio, recorte):
@@ -179,11 +163,6 @@ class AuxCanvas():
                 if (j - centro_x)**2 + (i - centro_y)**2 <= raio**2:
                     canvas[i, j] = 1
                     
-        # Return the updated piece with its coordinates in the LayoutDisplayMixin system
-        resultado = copy.deepcopy(recorte)
-        resultado["x"] = x
-        resultado["y"] = y  # This is already in bottom-left coordinate system
-        return resultado
 
     # Função para verificar sobreposição
     @staticmethod
@@ -284,28 +263,23 @@ class AuxCanvas():
                 # Desenhar apenas se não houver sobreposição
                 if not sobreposicao:
                     if tipo == "retangular":
-                        updated_piece = self.desenhar_retangulo(self.canvas, x, y, largura, altura, recorte)
-                        novo_recorte = recorte.copy()
-                        novo_recorte["x"] = x
-                        novo_recorte["y"] = y
-                        recortes_inseridos.append(novo_recorte)
+                        self.desenhar_retangulo(self.canvas, x, y, largura, altura, recorte)
                         print(f"Elemento {indice}: Retângulo adicionado em ({x}, {y}), tamanho: {largura}x{altura}")
                     elif tipo == "diamante":
-                        updated_piece = self.desenhar_diamante(self.canvas, x, y, largura, altura, recorte)
-                        novo_recorte = recorte.copy()
-                        novo_recorte["x"] = x
-                        novo_recorte["y"] = y
-                        recortes_inseridos.append(novo_recorte)
+                        self.desenhar_diamante(self.canvas, x, y, largura, altura, recorte)
                         print(f"Elemento {indice}: Diamante adicionado em ({x}, {y}), tamanho: {largura}x{altura}")
                     elif tipo == "circular":
-                        updated_piece = self.desenhar_circulo(self.canvas, x, y, raio, recorte)
-                        novo_recorte = recorte.copy()
-                        novo_recorte["x"] = x
-                        novo_recorte["y"] = y
-                        recortes_inseridos.append(novo_recorte)
+                        self.desenhar_circulo(self.canvas, x, y, raio, recorte)
                         print(f"Elemento {indice}: Círculo adicionado em ({x}, {y}), raio: {raio}")
+
+                    novo_recorte = recorte.copy()
+                    novo_recorte["x"] = x
+                    novo_recorte["y"] = y
+                    recortes_inseridos.append(novo_recorte)
+
                 else:
                     print(f"Elemento {indice}: Não foi possível adicionar {tipo} - Sobreposição detectada")
+
             except Exception as e:
                 print(f"Error processing element {indice}: {str(e)}")
                 
