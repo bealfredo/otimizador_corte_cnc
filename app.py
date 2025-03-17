@@ -17,19 +17,34 @@ def main():
     #     {"tipo": "diamante", "largura": 30, "altura": 20, "x": 0, "y": 0, "rotacao": 0}
     # ]
 
+    # recortes_disponiveis = [
+    #     {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 1, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 29, "altura": 29, "x": 31, "y": 1, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 31, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 69, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 139, "altura": 29, "x": 60, "y": 70, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 60, "altura": 8, "x": 66, "y": 52, "rotacao": 0},
+    #     {"tipo": "retangular", "largura": 44, "altura": 4, "x": 117, "y": 39, "rotacao": 0},
+    #     {"tipo": "diamante", "largura": 29, "altura": 48, "x": 32, "y": 31, "rotacao": 0},
+    #     {"tipo": "diamante", "largura": 29, "altura": 48, "x": 62, "y": 2, "rotacao": 0},
+    #     {"tipo": "diamante", "largura": 29, "altura": 48, "x": 94, "y": 2, "rotacao": 0},
+    #     {"tipo": "circular", "r": 16, "x": 124, "y": 2},
+    #     {"tipo": "circular", "r": 16, "x": 158, "y": 2}
+    # ]
+
     recortes_disponiveis = [
-        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 1, "rotacao": 0},
-        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 31, "y": 1, "rotacao": 0},
-        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 31, "rotacao": 0},
-        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 1, "y": 69, "rotacao": 0},
-        {"tipo": "retangular", "largura": 139, "altura": 29, "x": 60, "y": 70, "rotacao": 0},
-        {"tipo": "retangular", "largura": 60, "altura": 8, "x": 66, "y": 52, "rotacao": 0},
-        {"tipo": "retangular", "largura": 44, "altura": 4, "x": 117, "y": 39, "rotacao": 0},
-        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 32, "y": 31, "rotacao": 0},
-        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 62, "y": 2, "rotacao": 0},
-        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 94, "y": 2, "rotacao": 0},
-        {"tipo": "circular", "r": 16, "x": 124, "y": 2},
-        {"tipo": "circular", "r": 16, "x": 158, "y": 2}
+        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 5, "y": 5, "rotacao": 0},
+        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 40, "y": 5, "rotacao": 0},
+        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 5, "y": 40, "rotacao": 0},
+        {"tipo": "retangular", "largura": 29, "altura": 29, "x": 40, "y": 40, "rotacao": 0},
+        {"tipo": "retangular", "largura": 139, "altura": 29, "x": 100, "y": 90, "rotacao": 0},
+        {"tipo": "retangular", "largura": 60, "altura": 8, "x": 80, "y": 2, "rotacao": 0},
+        {"tipo": "retangular", "largura": 44, "altura": 4, "x": 150, "y": 90, "rotacao": 0},
+        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 2, "y": 60, "rotacao": 0},
+        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 50, "y": 55, "rotacao": 0},
+        {"tipo": "diamante", "largura": 29, "altura": 48, "x": 180, "y": 50, "rotacao": 0},
+        {"tipo": "circular", "r": 16, "x": 90, "y": 80},
+        {"tipo": "circular", "r": 16, "x": 10, "y": 90}
     ]
 
     # # Instantiate and run Ant Colony Optimization.
@@ -46,7 +61,7 @@ def main():
 
     # Instantiate and run Genetic Algorithm.
     ga_optimizer = GeneticAlgorithm(TAM_POP=50, recortes_disponiveis=recortes_disponiveis,
-                                    sheet_width=sheet_width, sheet_height=sheet_height, numero_geracoes=10)
+                                    sheet_width=sheet_width, sheet_height=sheet_height, numero_geracoes=300)
     print("Running Genetic Algorithm...")
     ga_optimized_layout = ga_optimizer.optimize_and_display() 
 
